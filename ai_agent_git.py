@@ -1,13 +1,15 @@
 #App.py file using Streamlit for dashboard, yahoo finance for stocks data and langchain for document processing.
 # LLM used : Groq with llama 3.1 (8b)
 
+# Importing all the dependencies
+import numpy as np
 import os
 import streamlit as st
 import yfinance as yf
 from langchain_community.document_loaders import PyPDFLoader
 from groq import Groq
 
-# Configuration 
+# Page Configuration 
 st.set_page_config(page_title="Financial Report Agent", layout="wide")
 
 # Initiallising LLM
@@ -16,13 +18,15 @@ client = Groq(api_key=GROQ_API_KEY)
 
 MODEL_NAME = "llama-3.1-8b-instant"  # Strong reasoning model on Groq
 
-# Defining Helper Function ( 1. PDF Loader , Agents - Company name, Generate NSE ticker, Stock data)
+# Defining Helper Functions ( 1. PDF Loader , Agents - Company name, Generate NSE ticker, Stock data)
+
+# 1. PDF Loader from Langchain
 def load_pdf_text(file_path):
     loader = PyPDFLoader(file_path)
     pages = loader.load()
     text = "\n".join([p.page_content for p in pages])
     return text
-
+# 2. Responses from Groq
 def groq_completion(prompt):
     response = client.chat.completions.create(
         model=MODEL_NAME,
@@ -33,7 +37,7 @@ def groq_completion(prompt):
         temperature=0.2
     )
     return response.choices[0].message.content.strip()
-
+# 3. Extract company name (Agent)
 def extract_company_name(pdf_text):
     prompt = f"""
     From the following financial statement text, extract ONLY the company name.
@@ -44,7 +48,7 @@ def extract_company_name(pdf_text):
     """
     result = groq_completion(prompt)
     return result
-
+# 4. Generate NSE Ticker (for NSE stock check on yfinance) -(Agent)
 def generate_nse_ticker(company_name):
     """
     Use Groq model to predict probable NSE ticker symbol.
@@ -62,7 +66,6 @@ def generate_nse_ticker(company_name):
     except Exception:
         return None
 
-
 def validate_ticker(ticker):
     """
     Validate ticker by checking if price data exists.
@@ -76,12 +79,12 @@ def validate_ticker(ticker):
         pass
     return None
 
-
+# Stock Trends from 
 def fetch_stock_trend(company_name):
     ticker_guess = generate_nse_ticker(company_name)
     valid_ticker = validate_ticker(ticker_guess) if ticker_guess else None
 
-    # Fallback heuristic
+    # Fallback
     if not valid_ticker:
         fallback = company_name.split()[0].upper() + ".NS"
         valid_ticker = validate_ticker(fallback)
@@ -98,7 +101,7 @@ def fetch_stock_trend(company_name):
         confirm = st.button("Confirm Ticker")
 
         if not confirm:
-            st.stop()  # ⛔ Pause execution until user confirms
+            st.stop()  
 
         manual_ticker_full = manual_ticker.upper() + ".NS"
         valid_ticker = validate_ticker(manual_ticker_full)
@@ -113,9 +116,12 @@ def fetch_stock_trend(company_name):
     if hist.empty:
         return "UNKNOWN", 0, valid_ticker
 
-    trend = "UPWARD" if hist['Close'].iloc[-1] > hist['Close'].iloc[0] else "DOWNWARD"
-    pct_change = ((hist['Close'].iloc[-1] - hist['Close'].iloc[0]) / hist['Close'].iloc[0]) * 100
-
+    #Calcuate trend and pct change
+    y = hist['Close'].dropna().values
+    x = np.arrange(len(y))
+    slope, intercept = np.polyfit(x,y,1)
+    trend = "UPWARD" if slope > 0 else "DOWNWARD"
+    pct_change = (slope / np.mean(y))*100
     return trend, round(pct_change, 2), valid_ticker
 
 def create_financial_summary(pdf_text):
