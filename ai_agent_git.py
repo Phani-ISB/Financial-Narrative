@@ -118,7 +118,7 @@ def fetch_stock_trend(company_name):
 
     #Calcuate trend and pct change
     y = hist['Close'].dropna().values
-    x = np.arrange(len(y))
+    x = np.arange(len(y))
     slope, intercept = np.polyfit(x,y,1)
     trend = "UPWARD" if slope > 0 else "DOWNWARD"
     pct_change = (slope / np.mean(y))*100
