@@ -1,0 +1,7 @@
+streamlit
+groq
+langchain
+langchain-community
+pypdf
+yfinance
+python-dotenv
